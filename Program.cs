@@ -3,9 +3,12 @@ using System.Runtime.InteropServices;
 
 class Program
 {
+    private static uint PROCESS_ALL_ACCESS = 0x001F0FFF;
+    
     static void Main()
     {
         // Declare variables
+        var intRead = 0;
         var varInt = 123456;
         var varString = "DefaultString";
         const int arraySize = 128;
@@ -20,13 +23,41 @@ class Program
 
         // Use IntPtr to simulate pointer behavior
         var ptr2int = handleInt.AddrOfPinnedObject();
-        var secondPtr2Int = handleInt.AddrOfPinnedObject();
         var ptr2ptr = Marshal.AllocHGlobal(IntPtr.Size);
         Marshal.WriteIntPtr(ptr2ptr, ptr2int);  // Store the address of ptr2int in ptr2ptr
         var ptr2ptr2 = Marshal.AllocHGlobal(IntPtr.Size);
         Marshal.WriteIntPtr(ptr2ptr2, ptr2ptr); // Store the address of ptr2ptr in ptr2ptr2
 
-        while (true)
+        // Open the current process
+        var processId = GetCurrentProcessId();
+        var processHandle = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
+        byte[] buffer = new byte[sizeof(int)];
+        int bytesRead;
+
+        if (processHandle == IntPtr.Zero)
+        {
+            Console.WriteLine("Failed to open process.");
+            return;
+        }
+
+        var success = ReadProcessMemory(processHandle, ptr2int, buffer, (uint)buffer.Length, out bytesRead);
+        if (success && bytesRead == sizeof(int))
+        {
+            // Convert byte array to integer
+            intRead = BitConverter.ToInt32(buffer, 0);
+            Console.WriteLine($"Read int: {intRead}");
+        }
+        else
+        {
+            Console.WriteLine("Failed to read memory.");
+        }
+        
+        // Cleanup handles
+        handleInt.Free();
+        handleString.Free();
+        handleArrChar.Free();
+        
+        /* while (true)
         {
             // Print process ID in decimal
             Console.WriteLine($"Process ID (in decimal): {GetCurrentProcessId()}");
@@ -48,9 +79,17 @@ class Program
 
             // Print separator line
             Console.WriteLine(new string('-', 50));
-        }
+        } */
+
+
     }
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentProcessId();
+    
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+    
+    [DllImport("kernel32.dll")]
+    private static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint dwSize, out int lpNumberOfBytesRead);
 }
