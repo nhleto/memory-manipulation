@@ -3,12 +3,13 @@ using System.Runtime.InteropServices;
 
 class Program
 {
-    private static uint PROCESS_ALL_ACCESS = 0x001F0FFF;
+    private static uint PROCESS_READ_ACCESS = 0x0010;
     
     static void Main()
     {
         // Declare variables
         var intRead = 0;
+        var readString = "";
         var varInt = 123456;
         var varString = "DefaultString";
         const int arraySize = 128;
@@ -27,12 +28,14 @@ class Program
         Marshal.WriteIntPtr(ptr2ptr, ptr2int);  // Store the address of ptr2int in ptr2ptr
         var ptr2ptr2 = Marshal.AllocHGlobal(IntPtr.Size);
         Marshal.WriteIntPtr(ptr2ptr2, ptr2ptr); // Store the address of ptr2ptr in ptr2ptr2
+        
+        var ptrToString = handleString.AddrOfPinnedObject();
+        var stringSize = (varString.Length + 1) * sizeof(char); // +1 for the null terminator
+        var bufferString = new byte[stringSize];
 
         // Open the current process
         var processId = GetCurrentProcessId();
-        var processHandle = OpenProcess(PROCESS_ALL_ACCESS, false, processId);
-        byte[] buffer = new byte[sizeof(int)];
-        int bytesRead;
+        var processHandle = OpenProcess(PROCESS_READ_ACCESS, false, processId);
 
         if (processHandle == IntPtr.Zero)
         {
@@ -40,23 +43,24 @@ class Program
             return;
         }
 
-        var success = ReadProcessMemory(processHandle, ptr2int, buffer, (uint)buffer.Length, out bytesRead);
-        if (success && bytesRead == sizeof(int))
+        var success = ReadProcessMemory(processHandle, ptrToString, bufferString, (uint)bufferString.Length, out var bytesReadString);
+        if (success && bytesReadString == stringSize)
         {
             // Convert byte array to integer
-            intRead = BitConverter.ToInt32(buffer, 0);
-            Console.WriteLine($"Read int: {intRead}");
+            readString = System.Text.Encoding.Unicode.GetString(bufferString, 0, bytesReadString);
+            Console.WriteLine($"Read string: {readString}");
         }
         else
         {
-            Console.WriteLine("Failed to read memory.");
+            Console.WriteLine($"Failed to read memory. {GetLastError()}");
         }
-        
+
         // Cleanup handles
         handleInt.Free();
         handleString.Free();
         handleArrChar.Free();
-        
+        CloseHandle(processHandle);
+
         /* while (true)
         {
             // Print process ID in decimal
@@ -91,5 +95,11 @@ class Program
     private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
     
     [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr hObject);
+    
+    [DllImport("kernel32.dll")]
     private static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, uint dwSize, out int lpNumberOfBytesRead);
+    
+    [DllImport("kernel32.dll")]
+    private static extern uint GetLastError();
 }
