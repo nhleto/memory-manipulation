@@ -11,4 +11,5 @@ acEntityManager.UpdateEntities();
 foreach (var entity in acEntityManager.GetEntities())
 {
     Console.WriteLine(entity.Name);
+    Console.WriteLine(entity.Health);
 }
