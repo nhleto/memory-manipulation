@@ -1,15 +1,15 @@
-using test_fun_proj.Models;
+using fun_time.Models;
 
-namespace test_fun_proj.EntityHandlers;
+namespace fun_time.EntityHandlers;
 
 public abstract class EntityManager
 {
     protected Entity LocalPlayer { get; set; } = new();
     protected List<Entity> Entities { get; set; } = new();
 
-    public abstract void UpdateEntity(Entity entity);
-    public abstract void UpdateLocalPlayer();
-    public abstract void UpdateEntities();
+    public abstract void ReadEntity(Entity entity);
+    public abstract void ReadLocalPlayer();
+    public abstract void ReadEntities();
 
     public Entity GetLocalPlayer()
     {

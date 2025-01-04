@@ -20,39 +20,39 @@ public class AcPlayer
     
     public static int ProcessId => GetAssaultCubeProcess();
 
-    public void TopOffHealth(Bypass bypass)
-    {
-        /* while (true)
-        {
-            // Reading
-            Console.WriteLine("Reading value...");
-            var addy = GameAddres + BaseAddress;
-            if (bypass.Read( addy + HpOffset, out var intRead))
-            {
-                Console.WriteLine($"Value read: {intRead}");
-                if (intRead >= 200)
-                {
-                    continue;
-                }
-            }
-            else
-            {
-                Console.WriteLine("Failed to read memory. Error: " + Marshal.GetLastWin32Error());
-            }
-
-            Console.WriteLine("Writing value...");
-            if (bypass.Write(BaseAddress + HpOffset, 200))
-            {
-                Console.WriteLine("Value written successfully.");
-            }
-            else
-            {
-                Console.WriteLine("Failed to write memory. Error: " + Marshal.GetLastWin32Error());
-            }
-
-            Thread.Sleep(1000);
-        } */
-    }
+    // public void TopOffHealth(Bypass bypass)
+    // {
+    //       while (true)
+    //      {
+    //          // Reading
+    //          Console.WriteLine("Reading value...");
+    //          var addy = GameAddres + BaseAddress;
+    //          if (bypass.Read( addy + HpOffset, out var intRead))
+    //          {
+    //              Console.WriteLine($"Value read: {intRead}");
+    //              if (intRead >= 200)
+    //              {
+    //                  continue;
+    //              }
+    //          }
+    //          else
+    //          {
+    //              Console.WriteLine("Failed to read memory. Error: " + Marshal.GetLastWin32Error());
+    //          }
+    //
+    //          Console.WriteLine("Writing value...");
+    //          if (bypass.Write(BaseAddress + HpOffset, 200))
+    //          {
+    //              Console.WriteLine("Value written successfully.");
+    //          }
+    //          else
+    //          {
+    //              Console.WriteLine("Failed to write memory. Error: " + Marshal.GetLastWin32Error());
+    //          }
+    //
+    //          Thread.Sleep(1000);
+    //      } 
+    // }
     
     // Static method to find the AssaultCube process by name
     private static int GetAssaultCubeProcess()

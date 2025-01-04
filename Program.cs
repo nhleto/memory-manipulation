@@ -5,11 +5,20 @@ var bypass = new Bypass("ac_client");
 var moduleBase = bypass.GetModuleBase(".exe");
 
 var acEntityManager = new AcEntityManager(moduleBase, bypass);
-acEntityManager.UpdateLocalPlayer();
-acEntityManager.UpdateEntities();
+acEntityManager.ReadLocalPlayer();
+acEntityManager.ReadEntities();
+await acEntityManager.KeepMeAlive();
 
-foreach (var entity in acEntityManager.GetEntities())
+var ents = acEntityManager.GetEntities();
+
+if (ents.Count == 0)
 {
-    Console.WriteLine(entity.Name);
-    Console.WriteLine(entity.Health);
+    Console.WriteLine("No entities found");
+    return;
 }
+
+// foreach (var entity in ents)
+// {
+//     Console.WriteLine(entity.Name);
+//     Console.WriteLine(entity.Health);
+// }
