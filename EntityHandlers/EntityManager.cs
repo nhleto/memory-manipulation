@@ -8,8 +8,8 @@ public abstract class EntityManager
     protected List<Entity> Entities { get; set; } = new();
 
     public abstract void ReadEntity(Entity entity);
-    public abstract void ReadLocalPlayer();
-    public abstract void ReadEntities();
+    public abstract Entity GetUpdatedLocalPlayer();
+    public abstract List<Entity> GetUpdatedEntities();
 
     public Entity GetLocalPlayer()
     {

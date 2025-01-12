@@ -1,108 +1,159 @@
-using System;
-using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using fun_time.Models;
 using fun_time.Offsets;
 
-namespace fun_time.EntityHandlers
+namespace fun_time.EntityHandlers;
+
+public class AcEntityManager : EntityManager
 {
-    public class AcEntityManager : EntityManager
+    private readonly Bypass _bypass;
+    private readonly nint _mainModule;
+    private const int RightMouseKey = 0x02;
+
+    public AcEntityManager(nint mainModule, Bypass bypass)
     {
-        private readonly Bypass _bypass;
-        private readonly nint _mainModule;
+        _mainModule = mainModule;
+        _bypass = bypass;
+    }
 
-        public AcEntityManager(nint mainModule, Bypass bypass)
+    [DllImport("user32.dll")]
+    private static extern short GetAsyncKeyState(int vKey);
+
+
+    public override void ReadEntity(Entity entity)
+    {
+        entity.Health = _bypass.ReadInt(entity.BaseAddress + AcOffsets.HpOffset);
+        entity.HeadPosition = _bypass.ReadVec(entity.BaseAddress + AcOffsets.HeadOffset);
+        entity.ViewMatrix = _bypass.ReadVec(entity.BaseAddress + AcOffsets.AnglesOffset);
+        entity.Team = _bypass.ReadInt(entity.BaseAddress + AcOffsets.TeamOffset);
+        entity.IsDead = _bypass.ReadInt(entity.BaseAddress + AcOffsets.DeadOffset);
+
+        var nameBytes = _bypass.ReadBytes(entity.BaseAddress + AcOffsets.NameOffset, 11);
+        entity.Name = Encoding.UTF8.GetString(nameBytes).TrimEnd('\0'); // Remove trailing null characters
+    }
+
+    private void UpdateEntityHp(Entity entity)
+    {
+        _bypass.WriteInt(entity.BaseAddress + AcOffsets.HpOffset, 200);
+    }
+
+    public override Entity GetUpdatedLocalPlayer()
+    {
+        LocalPlayer.BaseAddress = _bypass.ReadInt(_mainModule + AcOffsets.LocalPlayer);
+        ReadEntity(LocalPlayer);
+        return LocalPlayer;
+    }
+
+    public override List<Entity> GetUpdatedEntities()
+    {
+        Entities.Clear();
+        var localPlayer = GetUpdatedLocalPlayer();
+
+        var entityListAddress = (nint)_bypass.ReadInt(_mainModule + AcOffsets.EntityList);
+
+        for (var i = 0; i < 10; i++)
         {
-            _mainModule = mainModule;
-            _bypass = bypass;
-        }
+            var entityOffset = i * AcOffsets.EntityListOffset;
+            var entityAddress = (nint)_bypass.ReadInt(entityListAddress + entityOffset);
 
-        public override void ReadEntity(Entity entity)
-        {
-            entity.Health = _bypass.ReadInt(entity.BaseAddress + AcOffsets.HpOffset);
+            if (entityAddress == IntPtr.Zero) continue;
 
-            var nameBytes = _bypass.ReadBytes(entity.BaseAddress + AcOffsets.NameOffset, 11);
-            entity.Name = Encoding.UTF8.GetString(nameBytes).TrimEnd('\0');  // Remove trailing null characters
-        }
-
-        public void UpdateEntityHp(Entity entity)
-        {
-            _bypass.WriteInt(entity.BaseAddress + AcOffsets.HpOffset, 200);
-        }
-        
-        public override void ReadLocalPlayer()
-        {
-            LocalPlayer.BaseAddress = _bypass.ReadInt(_mainModule + AcOffsets.LocalPlayer);
-            ReadEntity(LocalPlayer);
-        }
-
-        public override void ReadEntities()
-        {
-            Entities.Clear();
-
-            var entityListAddress = (nint)_bypass.ReadInt(_mainModule + AcOffsets.EntityList);
-
-            for (var i = 0; i < 10; i++)
+            var entity = new Entity
             {
-                var entityOffset = i * AcOffsets.EntityListOffset;
-                var entityAddress = (nint)_bypass.ReadInt(entityListAddress + entityOffset);
+                BaseAddress = entityAddress
+            };
 
-                if (entityAddress == IntPtr.Zero) continue;
+            ReadEntity(entity);
+            entity.Magnitude = CalculateMagnitude(localPlayer, entity);
+            Entities.Add(entity);
+        }
 
-                var entity = new Entity
+        return Entities;
+    }
+
+    public void LoadAimBot()
+    {
+        var thread = new Thread(GetClosestEnemyHead);
+        thread.Start();
+    }
+
+    private void GetClosestEnemyHead()
+    {
+        while (true)
+        {
+            var localPlayer = GetUpdatedLocalPlayer();
+            var entities = GetUpdatedEntities().OrderBy(ent => ent.Magnitude)
+                .Where(ent => ent.Team != localPlayer.Team && ent.IsDead != 1);
+
+            foreach (var entity in entities)
+            {
+                if (GetAsyncKeyState(RightMouseKey) < 0)
                 {
-                    BaseAddress = entityAddress
-                };
-
-                ReadEntity(entity);
-                Entities.Add(entity);
-            }
-        }
-
-        public void NoRecoil()
-        {
-            if (LocalPlayer == null)
-            {
-                ReadLocalPlayer();
-            }
-
-            var player = GetLocalPlayer();
-            var recoAddy = player.BaseAddress + AcOffsets.GunRecoil;
-            _bypass.WriteInt(player.BaseAddress + AcOffsets.GunRecoil, 0);
-        }
-
-        public async Task KeepMeAlive()
-        {
-            while (true)
-            {
-                ReadLocalPlayer();
-                var player = GetLocalPlayer();
-                
-                Console.WriteLine(player.Name);
-                Console.WriteLine(player.Health);
-                if (player.Health < 200)
-                {
-                    player.Health = 200;
-                    Console.WriteLine("health is below 100");
-                    UpdateEntityHp(player);
+                    var angles = CalculateAngles(localPlayer, entity);
+                    Aim(localPlayer, angles.X, angles.Y);
+                    
+                    break;
                 }
-                
-                
-                await Task.Delay(100);
             }
-        }
 
-        // Calculate angle between two vectors
-        private static Vector3 CalculateAngles(Vector3 source, Vector3 destination)
+            Thread.Sleep(20);
+        }
+    }
+
+    public async Task KeepMeAlive()
+    {
+        while (true)
         {
-            Vector3 delta = destination - source;
-            float hypotenuse = (float)Math.Sqrt(delta.X * delta.X + delta.Y * delta.Y);
+            GetUpdatedLocalPlayer();
+            var player = GetLocalPlayer();
 
-            float pitch = (float)(Math.Atan2(delta.Z, hypotenuse) * (180.0 / Math.PI));
-            float yaw = (float)(Math.Atan2(delta.Y, delta.X) * (180.0 / Math.PI));
+            Console.WriteLine(player.Name);
+            Console.WriteLine(player.Health);
+            if (player.Health < 200)
+            {
+                player.Health = 200;
+                Console.WriteLine("health is below 100");
+                UpdateEntityHp(player);
+            }
 
-            return new Vector3(pitch, yaw, 0);
+
+            await Task.Delay(100);
         }
+    }
+
+    private float CalculateMagnitude(Entity localPlayer, Entity destinationEntity)
+    {
+        return (float)Math.Sqrt(Math.Pow(destinationEntity.HeadPosition.X - localPlayer.HeadPosition.X, 2) +
+                                Math.Pow(destinationEntity.HeadPosition.Y - localPlayer.HeadPosition.Y, 2) +
+                                Math.Pow(destinationEntity.HeadPosition.Z - localPlayer.HeadPosition.Z, 2));
+    }
+
+
+    // Calculate angle between two vectors
+    private static Vector2 CalculateAngles(Entity localPlayer, Entity destinationEntity)
+    {
+        var deltaX = destinationEntity.HeadPosition.X - localPlayer.HeadPosition.X;
+        var deltaY = destinationEntity.HeadPosition.Y - localPlayer.HeadPosition.Y;
+
+        var x = (float)(Math.Atan2(deltaY, deltaX) * 180 / Math.PI) + 90;
+        var deltaZ = destinationEntity.HeadPosition.Z - localPlayer.HeadPosition.Z;
+        var distance = CalculateDistance(localPlayer, destinationEntity);
+
+        var y = (float)(Math.Atan2(deltaZ, distance) * 180 / Math.PI);
+        return new Vector2(x, y);
+    }
+
+    private void Aim(Entity ent, float x, float y)
+    {
+        _bypass.WriteFloat(ent.BaseAddress, AcOffsets.AnglesOffset, x);
+        _bypass.WriteFloat(ent.BaseAddress, AcOffsets.AnglesOffset + 0x4, y);
+    }
+
+    private static float CalculateDistance(Entity localPlayer, Entity destEnt)
+    {
+        return (float)Math.Sqrt(Math.Pow(destEnt.HeadPosition.X - localPlayer.HeadPosition.X, 2) +
+                                Math.Pow(destEnt.HeadPosition.Y - localPlayer.HeadPosition.Y, 2));
     }
 }

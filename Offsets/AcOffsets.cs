@@ -13,7 +13,7 @@ public static class AcOffsets
     
     // Player offsets (from Player struct)
     public static int HeadOffset = 0x4;       // hPos in C++ struct
-    public static int FeetOffset = 0x28;      // pPos in C++ struct
+    public static int Angles = 0x28;      // pPos in C++ struct
     public static int AnglesOffset = 0x34;    // Where pYaw starts
     public static int PitchOffset = 0x38;     // Added from C++ struct
     public static int HpOffset = 0xEC;        // pHealth in C++ struct

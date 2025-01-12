@@ -309,6 +309,11 @@ public class Bypass
     {
         return WriteBytes(address + offset, BitConverter.GetBytes(value));
     }
+    
+    public bool WriteFloat(IntPtr address, int offset, float value)
+    {
+        return WriteBytes(address + offset, BitConverter.GetBytes(value));
+    }
 
     public bool WriteShort(IntPtr address, short value)
     {
@@ -371,6 +376,7 @@ public class Bypass
         return WriteBytes(address, nopArray);
     }
 
+    
     #endregion
 
     #region SIG SCANNING
